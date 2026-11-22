@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 220 20% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --muted: 220 14% 94%;
+  --muted-foreground: 215 16% 40%;
+  --border: 220 13% 88%;
+  --primary: 221 83% 45%;
+  --primary-foreground: 0 0% 100%;
+  --destructive: 0 72% 45%;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-background text-foreground antialiased; font-size: 14px; }
+*:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+
+/* status bands: colour + text label (colour-blind safe), WCAG AA contrast */
+.band-bench { background: #fde2e1; color: #8a1c14; }
+.band-light { background: #fff1c2; color: #6b4a00; }
+.band-healthy { background: #d9f2e1; color: #145a32; }
+.band-hot { background: #ffd7b0; color: #7a3300; }
+.band-over { background: #f7b7b2; color: #6e0f0a; font-weight: 600; }
+.band-none { background: #eceff3; color: #475467; }
+
+.ag-theme-quartz { --ag-font-size: 13px; --ag-row-height: 32px; --ag-header-height: 36px; --ag-grid-size: 5px; }
+.ag-theme-quartz .cell-nonbillable { color: #667085; font-style: italic; }
+.ag-theme-quartz .cell-edited { box-shadow: inset 3px 0 0 #1d4ed8; }
+.ag-theme-quartz .ag-row-pinned { font-weight: 600; }
