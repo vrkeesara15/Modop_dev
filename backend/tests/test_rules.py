@@ -55,7 +55,9 @@ def test_zero_confidence_excluded():
 
 def test_effective_confidence():
     assert rules.effective_confidence("released", 100, None, 0.5) == 0
-    assert rules.effective_confidence("confirmed", 75, None, 0.5) == 75
+    assert rules.effective_confidence("confirmed", 75, None, 0.5) == 100  # GL + PL agreed: firm
+    assert rules.effective_confidence("confirmed", 0, None, 0.5) == 0  # line dropped to 0%
+    assert rules.effective_confidence("proposed", 75, None, 0.5) == 75
     assert rules.effective_confidence("confirmed", None, "Soft", 0.5) == 50
     assert rules.effective_confidence("confirmed", None, "Hard", 0.5) == 100
 

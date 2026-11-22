@@ -237,6 +237,9 @@ def _merge(db: Session, run_id, raw_file_id, report_type, mapping, save, full_sn
     for r in valid.values():
         person_rows.setdefault(r["user_key"], r)
     person_of_key: dict[str, Person] = {}
+    from app.services import settings as settings_svc
+
+    std_hours = float(settings_svc.get(db, "std_hours_week") or 40)
     for key, r in person_rows.items():
         data = parser.pick(r, parser.PERSON_COLS)
         h = parser.row_hash(data)
@@ -263,7 +266,7 @@ def _merge(db: Session, run_id, raw_file_id, report_type, mapping, save, full_sn
             if r[opt]:
                 fields[opt] = r[opt]
         if p is None:
-            p = Person(source_key=key, row_hash=h, import_run_id=run_id, updated_by=actor_run, role_family=r["role_family"] or "Unassigned", **{k: v for k, v in fields.items() if k != "role_family"})
+            p = Person(source_key=key, row_hash=h, import_run_id=run_id, updated_by=actor_run, role_family=r["role_family"] or "Unassigned", std_hours_week=std_hours, **{k: v for k, v in fields.items() if k not in ("role_family", "std_hours_week")})
             db.add(p)
             db.flush()
             audit.log(db, entity="person", entity_id=p.id, entity_key=key, field=None, old=None, new=p.name, actor=actor_run, run_id=run_id, action="insert")
@@ -416,8 +419,12 @@ def _merge(db: Session, run_id, raw_file_id, report_type, mapping, save, full_sn
         _close_history(db, "allocation", a.id)
         _open_history(db, "allocation", a.id, key, data, r["_hash"], run_id)
 
-    # ---- soft deletes: keys in current but absent from a full snapshot
-    if full_snapshot:
+    # ---- soft deletes: keys in current but absent from a full snapshot.
+    # A snapshot with rejected rows (or no rows) is incomplete: a rejected booking would look "removed",
+    # so the deletion pass is skipped and the run summary says so.
+    if full_snapshot and (counts["rejected"] or not valid):
+        counts["snapshot_incomplete"] = 1
+    elif full_snapshot:
         for key, a in existing.items():
             if key in valid or a.is_deleted:
                 continue

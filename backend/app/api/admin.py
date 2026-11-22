@@ -10,7 +10,7 @@ from app.api.common import Lookups, opt_uuid, parse_uuid
 from app.auth.deps import CurrentUser, get_current_user, require_roles
 from app.auth.local import hash_password
 from app.db import get_db
-from app.models import Group, RateCard, TechLevel, User, UserRole
+from app.models import Group, Person, RateCard, TechLevel, User, UserRole
 from app.services import alerts as alerts_svc
 from app.services import audit
 from app.services import settings as settings_svc
@@ -49,6 +49,19 @@ def put_settings(body: dict, db: Session = Depends(get_db), user: CurrentUser = 
         steps = body["confidence_steps"]
         if not isinstance(steps, list) or {int(s["value"]) for s in steps} - {0, 25, 50, 75, 100}:
             raise HTTPException(422, "confidence steps use the fixed values 0/25/50/75/100; only labels are editable")
+    if "std_hours_week" in body:
+        try:
+            new_std = float(body["std_hours_week"])
+        except (TypeError, ValueError):
+            raise HTTPException(422, "std_hours_week must be a number")
+        if not 0 < new_std <= 80:
+            raise HTTPException(422, "std_hours_week must be between 0 and 80")
+        old_std = float(settings_svc.get(db, "std_hours_week"))
+        if abs(new_std - old_std) > 0.005:
+            # people still on the organisation default follow it; per-person overrides are kept
+            for per in db.scalars(select(Person).where(Person.std_hours_week == old_std)):
+                audit.log(db, entity="person", entity_id=per.id, field="std_hours_week", old=old_std, new=new_std, actor=user.email, reason="organisation standard hours changed")
+                per.std_hours_week, per.updated_by = new_std, user.email
     for k, v in body.items():
         old, new = settings_svc.put(db, k, v, user.email)
         audit.log(db, entity="setting", entity_id=k, field=k, old=old, new=new, actor=user.email)

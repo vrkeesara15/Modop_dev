@@ -70,6 +70,17 @@ def test_rejects_bad_rows(seeded):
         assert "row_no" in pipeline.rejects_csv(db, run.id)
 
 
+def test_snapshot_with_rejects_does_not_delete(seeded):
+    rows = seed.build_rows(metrics.current_week(), 1)
+    rows[0]["hours_per_day"] = "-3"  # one bad row in an otherwise full snapshot
+    run = _load(seed.to_csv(rows), "partial.csv", full_snapshot=True)
+    assert run.status == "succeeded"
+    assert run.counts["rejected"] == 1 and run.counts["removed"] == 0
+    assert run.counts.get("snapshot_incomplete") == 1
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count()).select_from(Allocation).where(Allocation.is_deleted.is_(True))) == 0
+
+
 def test_in_app_edit_is_protected(seeded):
     rows1 = seed.build_rows(metrics.current_week(), 1)
     rows2 = seed.build_rows(metrics.current_week(), 2)

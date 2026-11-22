@@ -166,11 +166,18 @@ def timeline(person_id: str, frm: date | None = None, to: date | None = None, db
 
     dl_conf = {d.id: d.confidence for d in db.scalars(select(DemandLine).where(DemandLine.id.in_([a.demand_line_id for a, _ in rows if a.demand_line_id])))}
     projects = []
+    other: dict[str, float] = {}
     for a, prj in rows:
         weeks = {w.week_start.isoformat(): float(w.hours) for w in a.weeks if start <= w.week_start <= end}
         if not weeks and a.state not in ("requested", "proposed"):
             continue
         visible = user.can_see_detail(p, prj, cfg["visibility_mode"])
+        if not visible:
+            # outside the caller's scope: fold into one aggregate row, no per-booking detail
+            if a.state not in ("released", "declined"):
+                for k, v in weeks.items():
+                    other[k] = other.get(k, 0) + v
+            continue
         conf = 0 if prj.status in metrics.INACTIVE_PROJECT else effective_confidence(a.state, dl_conf.get(a.demand_line_id), a.booking_type, float(cfg["soft_booking_weight"]))
         projects.append(
             {
@@ -185,6 +192,8 @@ def timeline(person_id: str, frm: date | None = None, to: date | None = None, db
                 "total_hours": round(sum(weeks.values()), 2),
             }
         )
+    if other:
+        projects.append({"allocation_id": "other", "project": {"id": None, "name": "Other commitments", "client": None}, "state": "other", "source": None, "billable": False, "confidence": None, "task_name": None, "weeks": other, "total_hours": round(sum(other.values()), 2)})
     weeks = [v.to_dict() for _, v in sorted(pw.items())]
     tot_bill = sum(w["billable_hours"] for w in weeks)
     tot_conf = sum(w["confirmed_hours"] for w in weeks)

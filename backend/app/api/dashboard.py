@@ -32,7 +32,13 @@ def _driver_named(d: dict | None, names: dict) -> dict | None:
 def gl_dashboard(group: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
     """DSH-1: own group by status band, hot vs light list, upcoming roll-offs in the next 4 weeks."""
     cfg = settings_svc.get_all(db)
-    gids = {parse_uuid(group)} if group else set(user.gl_group_ids)
+    if group:
+        gid = parse_uuid(group)
+        if not (user.has("admin", "sl") or gid in set(user.gl_group_ids) | set(user.sl_group_ids)):
+            raise forbid("You can only see the dashboard of a group you lead")
+        gids = {gid}
+    else:
+        gids = set(user.gl_group_ids)
     if not gids and user.has("admin", "sl"):
         gids = set(db.scalars(select(Group.id)))
     if not gids:
@@ -293,10 +299,14 @@ def heatmap_cell(week: date, person: str | None = None, group: str | None = None
             .join(Project, Project.id == Allocation.project_id)
             .where(Allocation.person_id == p.id, AllocationWeek.week_start == w, Allocation.is_deleted.is_(False))
         ).all()
-        items = []
+        items, other = [], 0.0
         for a, prj, hours in rows:
-            visible = user.can_see_detail(p, prj, cfg["visibility_mode"])
-            items.append({"allocation_id": str(a.id) if visible else None, "project_id": str(prj.id) if visible else None, "project_name": prj.name if visible else "Other commitments", "state": a.state, "hours": float(hours), "billable": bool(a.billable and prj.billable and prj.status == "active")})
+            if not user.can_see_detail(p, prj, cfg["visibility_mode"]):
+                other += float(hours)  # outside the caller's scope: only an aggregate
+                continue
+            items.append({"allocation_id": str(a.id), "project_id": str(prj.id), "project_name": prj.name, "state": a.state, "hours": float(hours), "billable": bool(a.billable and prj.billable and prj.status == "active")})
+        if other:
+            items.append({"allocation_id": None, "project_id": None, "project_name": "Other commitments", "state": "other", "hours": round(other, 2), "billable": False})
         return {"person": {"id": str(p.id), "name": p.name, "group_name": lk.group_name(p.group_id), "tech_level": lk.level_code(p.tech_level_id)}, "week": pw.to_dict(), "allocations": items}
     if group:
         gid = parse_uuid(group)

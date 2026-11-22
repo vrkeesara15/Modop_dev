@@ -98,6 +98,10 @@ def test_dashboard_and_heatmap_router(client, as_user):
     assert len(hm["rows"]) == 60 and len(hm["weeks"]) == 12
     cell = client.get(f"/api/heatmap/cell?person={hm['rows'][0]['id']}&week={W(0)}", headers=h).json()
     assert "allocations" in cell
+    # a GL cannot read another group's dashboard; SL can
+    other = next(x for x in client.get("/api/groups", headers=h).json() if not x["name"].startswith("Group B"))
+    assert client.get(f"/api/dashboard/gl?group={other['id']}", headers=h).status_code == 403
+    assert client.get(f"/api/dashboard/gl?group={other['id']}", headers=as_user("sl")).status_code == 200
     g = client.get("/api/heatmap?level=group", headers=h).json()["rows"][0]
     assert "people" in client.get(f"/api/heatmap/cell?group={g['id']}&week={W(0)}", headers=h).json()
 
@@ -139,6 +143,18 @@ def test_admin_and_audit_router(client, as_user):
     for view in ("heatmap", "grid", "availability", "leadership", "people", "projects", "audit"):
         r = client.get(f"/api/export/{view}.xlsx", headers=h)
         assert r.status_code == 200 and r.content[:2] == b"PK", view
+
+
+def test_org_standard_hours_follow_setting(client, as_user):
+    h = as_user("admin")
+    people = client.get("/api/people", headers=h).json()
+    on_default = [p for p in people if p["std_hours_week"] == 40]
+    custom = [p for p in people if p["std_hours_week"] != 40]
+    assert on_default
+    assert client.put("/api/admin/settings", json={"std_hours_week": 37.5}, headers=h).status_code == 200
+    after = {p["id"]: p["std_hours_week"] for p in client.get("/api/people", headers=h).json()}
+    assert all(after[p["id"]] == 37.5 for p in on_default)
+    assert all(after[p["id"]] == p["std_hours_week"] for p in custom)
 
 
 def test_requests_router_decline(client, as_user):

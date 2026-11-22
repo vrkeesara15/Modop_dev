@@ -27,7 +27,7 @@ export default function PersonPage() {
   const projects: any[] = tl.data?.projects ?? [];
   const chart = (tl.data?.weeks ?? []).map((w: any) => {
     const row: any = { week: fmtWeek(w.week_start), Capacity: w.capacity, _cur: w.week_start === tl.data.current_week };
-    projects.forEach((pr) => (row[pr.project.name + (pr.state !== "confirmed" ? ` (${pr.state})` : "")] = pr.weeks[w.week_start] ?? 0));
+    projects.forEach((pr) => (row[pr.project.name + (!["confirmed", "other"].includes(pr.state) ? ` (${pr.state})` : "")] = pr.weeks[w.week_start] ?? 0));
     return row;
   });
   return (
@@ -66,7 +66,7 @@ export default function PersonPage() {
                           <YAxis unit="h" fontSize={11} />
                           <Tooltip />
                           <Legend wrapperStyle={{ fontSize: 11 }} />
-                          {projects.map((pr, i) => <Bar key={pr.allocation_id} dataKey={pr.project.name + (pr.state !== "confirmed" ? ` (${pr.state})` : "")} stackId="h" fill={pr.billable ? COLORS[i % COLORS.length] : "#9ca3af"} fillOpacity={pr.state === "confirmed" ? 1 : 0.45} />)}
+                          {projects.map((pr, i) => <Bar key={pr.allocation_id} dataKey={pr.project.name + (!["confirmed", "other"].includes(pr.state) ? ` (${pr.state})` : "")} stackId="h" fill={pr.billable ? COLORS[i % COLORS.length] : "#9ca3af"} fillOpacity={pr.state === "confirmed" ? 1 : 0.45} />)}
                           <Line dataKey="Capacity" stroke="#111827" strokeDasharray="4 3" dot={false} />
                           <ReferenceLine x={fmtWeek(tl.data.current_week)} stroke="#1d4ed8" label={{ value: "now", fontSize: 10 }} />
                         </ComposedChart>
@@ -87,7 +87,7 @@ export default function PersonPage() {
                   <CardHeader title="Projects" />
                   {!projects.length ? <Empty>No allocations.</Empty> : (
                     <Table><thead><tr><Th>Project</Th><Th>State</Th><Th>Confidence</Th><Th>Billable</Th><Th>Source</Th><Th>Hours (16 wk)</Th></tr></thead>
-                      <tbody>{projects.map((pr) => <tr key={pr.allocation_id} className={pr.billable ? "" : "text-muted-foreground"}><Td>{pr.project.id ? <Link className="text-primary hover:underline" to={`/projects/${pr.project.id}`}>{pr.project.name}</Link> : pr.project.name} <span className="text-xs text-muted-foreground">{pr.task_name}</span></Td><Td><Badge variant={pr.state === "confirmed" ? "green" : pr.state === "released" ? "grey" : "blue"}>{pr.state}</Badge></Td><Td>{pr.confidence}%</Td><Td>{pr.billable ? "Yes" : "No"}</Td><Td className="text-xs">{pr.source}</Td><Td>{hrs(pr.total_hours)}</Td></tr>)}</tbody></Table>
+                      <tbody>{projects.map((pr) => <tr key={pr.allocation_id} className={pr.billable ? "" : "text-muted-foreground"}><Td>{pr.project.id ? <Link className="text-primary hover:underline" to={`/projects/${pr.project.id}`}>{pr.project.name}</Link> : pr.project.name} <span className="text-xs text-muted-foreground">{pr.task_name}</span></Td><Td><Badge variant={pr.state === "confirmed" ? "green" : pr.state === "released" ? "grey" : "blue"}>{pr.state}</Badge></Td><Td>{pr.confidence == null ? "–" : `${pr.confidence}%`}</Td><Td>{pr.billable ? "Yes" : "No"}</Td><Td className="text-xs">{pr.source}</Td><Td>{hrs(pr.total_hours)}</Td></tr>)}</tbody></Table>
                   )}
                 </Card>
               </>

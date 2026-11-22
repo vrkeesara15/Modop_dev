@@ -186,6 +186,9 @@ def effective_confidence(state: str, demand_confidence: int | None, booking_type
     """
     if state in ("released", "declined"):
         return 0
+    if state == "confirmed" and (booking_type or "").lower() != "soft":
+        # GL + PL agreed: firm work, unless the line itself has dropped to 0% (project fell through)
+        return 0 if demand_confidence == 0 else 100
     if demand_confidence is not None:
         return int(demand_confidence)
     if (booking_type or "").lower() == "soft" or state in ("proposed", "requested"):
